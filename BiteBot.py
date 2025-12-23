@@ -3,81 +3,102 @@ import google.generativeai as genai
 from PIL import Image
 import io
 
-# --- CONFIGURATION ---
-genai.configure(api_key="AIzaSyBFReqedPRF_LQaFeTwT5AlPwLN8drWnLQ")
-model = genai.GenerativeModel('gemini-1.5-pro')
+# --- 1. CONFIGURATION ---
+# Using st.secrets for safety on Streamlit Cloud
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except:
+    st.error("API Key not found! Please add GEMINI_API_KEY to your Streamlit Secrets.")
 
-st.set_page_config(page_title="BiteBot.ai | Fast Food, Faster", page_icon="⚡")
+# We use gemini-1.5-flash for maximum speed (ideal for BiteBot.ai)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- CUSTOM STYLING ---
+# --- 2. UI SETUP ---
+st.set_page_config(page_title="BiteBot.ai | Fast Food, Faster", page_icon="⚡", layout="centered")
+
+# Custom CSS for the 'Fast World' tech theme
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    h1 { color: #FF4B4B; font-family: 'Ubuntu', sans-serif; }
-    .stButton>button { background-color: #FF4B4B; color: white; border-radius: 20px; width: 100%; }
-    .recipe-card { padding: 20px; border-radius: 15px; background-color: #1e2130; border-left: 5px solid #FF4B4B; }
+    .stApp { background-color: #0e1117; color: white; }
+    h1 { color: #FFD700; font-family: 'Helvetica', sans-serif; text-align: center; }
+    .stButton>button { 
+        background-color: #FFD700; color: black; font-weight: bold; 
+        border-radius: 10px; height: 3em; width: 100%; border: none;
+    }
+    .recipe-card { 
+        padding: 20px; border-radius: 15px; background-color: #1e2130; 
+        border-left: 8px solid #FFD700; margin-top: 20px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER ---
 st.title("⚡ BiteBot.ai")
-st.subheader("Instant Indian Recipes for the Fast-Paced World.")
+st.markdown("<p style='text-align: center;'>No time to cook? BiteBot has you covered.</p>", unsafe_allow_html=True)
 
-# --- INPUT SECTION ---
-col1, col2 = st.columns([1, 1])
+# --- 3. INPUTS ---
+col1, col2 = st.columns(2)
 
 with col1:
-    st.write("### 📸 Scan your fridge")
-    uploaded_file = st.file_uploader("Upload or Snap", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("📸 Scan Pantry/Fridge", type=["jpg", "jpeg", "png"])
     if uploaded_file:
-        img = Image.open(uploaded_file)
-        st.image(img, use_container_width=True)
+        st.image(Image.open(uploaded_file), caption="Analyzing these...", use_container_width=True)
 
 with col2:
-    st.write("### ✍️ Or type it out")
-    text_ingredients = st.text_input("What ingredients are ready?", placeholder="Bread, eggs, onion...")
-    
-    speed_mode = st.select_slider(
-        "Max Cooking Time",
-        options=["5 min (Flash)", "10 min (Quick)", "15 min (Standard)"],
-        value="10 min (Quick)"
+    text_input = st.text_input("✍️ Or type ingredients", placeholder="e.g. Bread, Egg, Maggi")
+    diet = st.selectbox("Diet", ["Standard", "Vegetarian", "Vegan", "Jain"])
+    speed = st.select_slider("Speed Mode", options=["5 min", "10 min", "15 min"])
+
+# --- 4. GENERATION LOGIC ---
+if st.button("GET MY BITE 🍴"):
+    if not uploaded_file and not text_input:
+        st.warning("Please upload a photo or type ingredients first!")
+    else:
+        with st.spinner("⚡ Crunching data..."):
+            # System instructions focused on "BiteBot" speed theme
+            system_prompt = f"""
+            Act as BiteBot.ai, an AI chef for busy people. Create a {diet} Indian recipe 
+            ready in exactly {speed}. 
+            
+            Guidelines:
+            - Focus on SPEED and EASE.
+            - Use common Indian pantry items (poha, bread, besan, frozen peas, etc).
+            - Keep instructions to maximum 4 bullet points.
+            - Format: 
+              ## [Name of Dish]
+              **Time:** {speed}
+              **Ingredients:** (Include common Indian names in brackets)
+              **Steps:** (Short and snappy)
+              **Bite-Hack:** (A one-sentence shortcut)
+            """
+            
+            # Prepare content for Gemini
+            prompt_content = [system_prompt]
+            if uploaded_file:
+                prompt_content.append(Image.open(uploaded_file))
+            if text_input:
+                prompt_content.append(f"Ingredients: {text_input}")
+
+            try:
+                response = model.generate_content(prompt_content)
+                recipe_text = response.text
+                
+                # Store in session state for downloading
+                st.session_state['last_recipe'] = recipe_text
+                
+                # Display Recipe
+                st.markdown(f'<div class="recipe-card">{recipe_text}</div>', unsafe_allow_html=True)
+                
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+# --- 5. DOWNLOAD FEATURE ---
+if 'last_recipe' in st.session_state:
+    st.download_button(
+        label="📥 Download Recipe to Phone",
+        data=st.session_state['last_recipe'],
+        file_name="bitebot_recipe.txt",
+        mime="text/plain",
     )
 
-# --- LOGIC ---
-if st.button("GET MY BITE 🍴"):
-    with st.spinner("BiteBot is crunching the data..."):
-        
-        # Construct the specialized prompt
-        system_prompt = f"""
-        You are BiteBot.ai, an AI specialized in 15-minute Indian 'Quick-Bites'.
-        User wants a {speed_mode} recipe.
-        
-        Rules:
-        1. Use common Indian ingredients/shortcuts (Poha, Maggi, Bread, Paneer).
-        2. Steps must be 'Lazy-friendly' (Microwave, One-pan, No grinding).
-        3. Output must include:
-           - ⚡ Dish Name
-           - ⏱️ BiteTime (Total minutes)
-           - 🛒 What you need
-           - 🛠️ BiteSteps (Maximum 4 short steps)
-           - 💡 Pro Hack (A shortcut to save 2 minutes)
-        """
-        
-        content_to_send = [system_prompt]
-        
-        if uploaded_file:
-            content_to_send.append(Image.open(uploaded_file))
-        
-        if text_ingredients:
-            content_to_send.append(f"Ingredients provided: {text_ingredients}")
-
-        if not uploaded_file and not text_ingredients:
-            st.error("Give me something to work with! (Image or Text)")
-        else:
-            response = model.generate_content(content_to_send)
-            
-            st.markdown("---")
-            st.markdown(f'<div class="recipe-card">{response.text}</div>', unsafe_allow_html=True)
-
-# --- FOOTER ---
-st.sidebar.info("BiteBot.ai: Stop Thinking. Start Eating.")
+st.sidebar.markdown("---")
+st.sidebar.write("Developed by **BiteBot.ai**")
