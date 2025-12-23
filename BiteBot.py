@@ -53,4 +53,56 @@ with col2:
     st.write("### ✍️ Quick Type")
     text_items = st.text_input("List ingredients", placeholder="Bread, dahi, chilli...")
     diet = st.selectbox("Diet", ["All", "Vegetarian", "Jain", "Vegan"])
-    prep_time = st.select_slider("Max Time", options=["5 min", "10 min
+    prep_time = st.select_slider("Max Time", options=["5 min", "10 min", "15 min"])
+
+# --- 4. CORE ENGINE ---
+if st.button("GENERATE MY BITE"):
+    if not (uploaded_file or text_items):
+        st.warning("Please provide ingredients (photo or text)!")
+    else:
+        with st.spinner("⚡ Boiling the data..."):
+            # The BiteBot Persona Prompt
+            system_msg = f"""
+            You are BiteBot.ai, a speed-focused Indian Chef. 
+            Create a {diet} recipe ready in {prep_time}. 
+            
+            RULES:
+            1. Use common Indian ingredients/shortcuts.
+            2. Only 3-4 cooking steps max.
+            3. Must include:
+               - ## Dish Name
+               - ⏱️ BiteTime: (Total time)
+               - 🛒 Pantry: (Short list)
+               - 🛠️ BiteSteps: (Numbered list)
+               - 💡 Speed Hack: (One sentence pro-tip)
+            """
+            
+            # Pack content for the API
+            content_list = [system_msg]
+            if text_items: content_list.append(f"Ingredients: {text_items}")
+            if uploaded_file: content_list.append(Image.open(uploaded_file))
+            
+            try:
+                # Call Gemini 3 Flash
+                response = model.generate_content(content_list)
+                result = response.text
+                
+                # Cache for download
+                st.session_state['current_recipe'] = result
+                
+                # Display result in our styled card
+                st.markdown(f"<div class='recipe-card'>{result}</div>", unsafe_allow_html=True)
+                
+                # Show download button after generation
+                st.download_button(
+                    label="📥 Save to Phone",
+                    data=result,
+                    file_name="bitebot_recipe.txt",
+                    mime="text/plain"
+                )
+            except Exception as e:
+                st.error(f"Engine Error: {str(e)}")
+                st.info("Try refreshing the app or checking your API limits.")
+
+st.divider()
+st.caption("BiteBot.ai © 2025 | Built for speed.")
