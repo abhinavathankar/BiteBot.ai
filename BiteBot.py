@@ -31,7 +31,7 @@ if not model:
     st.stop()
 
 # --- 2. UI STYLING ---
-st.set_page_config(page_title="BiteBot.ai", page_icon="⚡")
+st.set_page_config(page_title="BiteBot.ai", page_icon="🍔")
 
 st.markdown(f"""
     <style>
@@ -42,7 +42,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<h1 class='main-title'>⚡ BiteBot.ai</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>🍔 BiteBot.ai</h1>", unsafe_allow_html=True)
 st.caption(f"Engine: {current_engine}")
 
 # --- 3. INPUTS ---
@@ -53,7 +53,7 @@ with col1:
         st.image(Image.open(uploaded_file), use_container_width=True)
 
 with col2:
-    text_items = st.text_input("✍️ Type Ingredients")
+    text_items = st.text_input("🌶️ Type Ingredients")
     diet = st.selectbox("Diet", ["Non-veg", "Veg", "Jain", "Vegan"])
     prep_time = st.select_slider("Max Time", options=["5 min", "10 min", "15 min"])
 
@@ -80,6 +80,7 @@ if st.button("GENERATE MY BITE"):
 
 st.divider()
 st.center = st.write("BiteBot.ai - Fast Food, Faster.")
+
 
 
 
