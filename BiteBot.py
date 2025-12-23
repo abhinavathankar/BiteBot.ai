@@ -35,7 +35,7 @@ st.set_page_config(page_title="BiteBot.ai", page_icon="⚡")
 
 st.markdown(f"""
     <style>
-    .stApp {{ background-color: #0f1116; color: #e0e0e0; }}
+    .stApp {{ background-color: #FFFFFF; color: #000000; }}
     .main-title {{ color: #FFCC00; font-size: 3rem; font-weight: 800; text-align: center; }}
     .stButton>button {{ background-color: #FFCC00; color: #000; font-weight: bold; width: 100%; border-radius: 8px; }}
     .recipe-card {{ padding: 20px; border-radius: 12px; background-color: #1a1c24; border-left: 6px solid #FFCC00; }}
@@ -80,3 +80,4 @@ if st.button("GENERATE MY BITE"):
 
 st.divider()
 st.center = st.write("BiteBot.ai - Fast Food, Faster.")
+
