@@ -4,101 +4,53 @@ from PIL import Image
 import io
 
 # --- 1. CONFIGURATION ---
-# Using st.secrets for safety on Streamlit Cloud
+# Robust setup to handle key and model availability
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except:
-    st.error("API Key not found! Please add GEMINI_API_KEY to your Streamlit Secrets.")
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+except Exception:
+    st.error("Missing GEMINI_API_KEY in Streamlit Secrets!")
+    st.stop()
 
-# We use gemini-1.5-flash for maximum speed (ideal for BiteBot.ai)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Auto-selection logic: Uses Gemini 3 Flash for maximum speed
+# Using the 'models/' prefix ensures the 404 error is bypassed
+MODEL_NAME = 'models/gemini-3-flash' 
+model = genai.GenerativeModel(MODEL_NAME)
 
-# --- 2. UI SETUP ---
-st.set_page_config(page_title="BiteBot.ai | Fast Food, Faster", page_icon="⚡", layout="centered")
+# --- 2. UI STYLING (The BiteBot.ai Identity) ---
+st.set_page_config(page_title="BiteBot.ai", page_icon="⚡", layout="centered")
 
-# Custom CSS for the 'Fast World' tech theme
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; color: white; }
-    h1 { color: #FFD700; font-family: 'Helvetica', sans-serif; text-align: center; }
+    .stApp { background-color: #0f1116; color: #e0e0e0; }
+    .main-title { color: #FFCC00; font-size: 3rem; font-weight: 800; text-align: center; margin-bottom: 0px; }
+    .sub-title { color: #888; text-align: center; margin-bottom: 30px; }
     .stButton>button { 
-        background-color: #FFD700; color: black; font-weight: bold; 
-        border-radius: 10px; height: 3em; width: 100%; border: none;
+        background-color: #FFCC00; color: #000; border-radius: 8px; 
+        font-weight: bold; width: 100%; border: none; padding: 10px;
     }
     .recipe-card { 
-        padding: 20px; border-radius: 15px; background-color: #1e2130; 
-        border-left: 8px solid #FFD700; margin-top: 20px;
+        padding: 25px; border-radius: 12px; background-color: #1a1c24; 
+        border-left: 6px solid #FFCC00; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("⚡ BiteBot.ai")
-st.markdown("<p style='text-align: center;'>No time to cook? BiteBot has you covered.</p>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>⚡ BiteBot.ai</h1>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>Indian recipes for a fast-moving world.</p>", unsafe_allow_html=True)
 
-# --- 3. INPUTS ---
-col1, col2 = st.columns(2)
+# --- 3. INPUT SECTION ---
+col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
-    uploaded_file = st.file_uploader("📸 Scan Pantry/Fridge", type=["jpg", "jpeg", "png"])
+    st.write("### 📸 Photo Pantry")
+    uploaded_file = st.file_uploader("Snap what you have...", type=["jpg", "jpeg", "png"])
     if uploaded_file:
-        st.image(Image.open(uploaded_file), caption="Analyzing these...", use_container_width=True)
+        display_img = Image.open(uploaded_file)
+        st.image(display_img, use_container_width=True, caption="BiteBot is looking...")
 
 with col2:
-    text_input = st.text_input("✍️ Or type ingredients", placeholder="e.g. Bread, Egg, Maggi")
-    diet = st.selectbox("Diet", ["Standard", "Vegetarian", "Vegan", "Jain"])
-    speed = st.select_slider("Speed Mode", options=["5 min", "10 min", "15 min"])
-
-# --- 4. GENERATION LOGIC ---
-if st.button("GET MY BITE 🍴"):
-    if not uploaded_file and not text_input:
-        st.warning("Please upload a photo or type ingredients first!")
-    else:
-        with st.spinner("⚡ Crunching data..."):
-            # System instructions focused on "BiteBot" speed theme
-            system_prompt = f"""
-            Act as BiteBot.ai, an AI chef for busy people. Create a {diet} Indian recipe 
-            ready in exactly {speed}. 
-            
-            Guidelines:
-            - Focus on SPEED and EASE.
-            - Use common Indian pantry items (poha, bread, besan, frozen peas, etc).
-            - Keep instructions to maximum 4 bullet points.
-            - Format: 
-              ## [Name of Dish]
-              **Time:** {speed}
-              **Ingredients:** (Include common Indian names in brackets)
-              **Steps:** (Short and snappy)
-              **Bite-Hack:** (A one-sentence shortcut)
-            """
-            
-            # Prepare content for Gemini
-            prompt_content = [system_prompt]
-            if uploaded_file:
-                prompt_content.append(Image.open(uploaded_file))
-            if text_input:
-                prompt_content.append(f"Ingredients: {text_input}")
-
-            try:
-                response = model.generate_content(prompt_content)
-                recipe_text = response.text
-                
-                # Store in session state for downloading
-                st.session_state['last_recipe'] = recipe_text
-                
-                # Display Recipe
-                st.markdown(f'<div class="recipe-card">{recipe_text}</div>', unsafe_allow_html=True)
-                
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-# --- 5. DOWNLOAD FEATURE ---
-if 'last_recipe' in st.session_state:
-    st.download_button(
-        label="📥 Download Recipe to Phone",
-        data=st.session_state['last_recipe'],
-        file_name="bitebot_recipe.txt",
-        mime="text/plain",
-    )
-
-st.sidebar.markdown("---")
-st.sidebar.write("Developed by **BiteBot.ai**")
+    st.write("### ✍️ Quick Type")
+    text_items = st.text_input("List ingredients", placeholder="Bread, dahi, chilli...")
+    diet = st.selectbox("Diet", ["All", "Vegetarian", "Jain", "Vegan"])
+    prep_time = st.select_slider("Max Time", options=["5 min", "10 min
