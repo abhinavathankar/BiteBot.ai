@@ -38,7 +38,7 @@ st.markdown(f"""
     .stApp {{ background-color: #FFFFFF; color: #000000; }}
     .main-title {{ color: #FFCC00; font-size: 3rem; font-weight: 800; text-align: center; }}
     .stButton>button {{ background-color: #FFCC00; color: #000; font-weight: bold; width: 100%; border-radius: 8px; }}
-    .recipe-card {{ padding: 20px; border-radius: 12px; background-color: #1a1c24; border-left: 6px solid #FFCC00; }}
+    .recipe-card {{ padding: 20px; border-radius: 12px; background-color: ##ffffff; border-left: 6px solid #FFCC00; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,4 +80,5 @@ if st.button("GENERATE MY BITE"):
 
 st.divider()
 st.center = st.write("BiteBot.ai - Fast Food, Faster.")
+
 
