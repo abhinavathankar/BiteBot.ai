@@ -54,7 +54,7 @@ with col1:
 
 with col2:
     text_items = st.text_input("✍️ Type Ingredients")
-    diet = st.selectbox("Diet", ["Standard", "Vegetarian", "Jain", "Vegan"])
+    diet = st.selectbox("Diet", ["Non-veg", "Veg", "Jain", "Vegan"])
     prep_time = st.select_slider("Max Time", options=["5 min", "10 min", "15 min"])
 
 # --- 4. RECIPE GENERATION ---
@@ -80,5 +80,6 @@ if st.button("GENERATE MY BITE"):
 
 st.divider()
 st.center = st.write("BiteBot.ai - Fast Food, Faster.")
+
 
 
