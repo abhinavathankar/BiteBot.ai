@@ -1,53 +1,47 @@
-🚀 Live Demo
-Check out the live app here: bitebotai.streamlit.app
+⚡ BiteBot.ai
+Instant Indian Recipes for the Fast-Paced World.
 
-✨ Features
-Visual Pantry (Multimodal): Upload a photo of your fridge or ingredients, and the AI "sees" what you have.
+🔗 Live App: https://bitebotai.streamlit.app/
 
-Speed-Centric: All recipes are optimized for 5, 10, or 15-minute preparation times.
+📖 The Story
+BiteBot.ai was born out of a real-world "emergency." While visiting my hometown, my mother left town for a day, leaving me in charge of the kitchen. Faced with a random mix of ingredients and zero desire for a 60-minute cooking session, I decided to build a solution.
 
-Regional Nuance: Expertly handles Indian ingredients, spices, and "speed-hacks" (like using a microwave for par-boiling).
+Instead of cooking lunch, I "cooked" BiteBot.ai—an AI assistant that turns fridge photos into 10-minute Indian meals.
 
-Dietary Filters: Supports Non-Veg, Veg, Jain, and Vegan preferences.
+✨ Key Features
+📸 Visual Pantry: Snap a photo of your fridge, and the AI "sees" what you have using Gemini Vision.
 
-Mobile-First Design: Light-mode optimized for easy reading while cooking in the kitchen.
+⏱️ Speed-First: Every recipe is optimized for 5, 10, or 15-minute prep times.
 
-🛠️ Tech Stack
-AI Engine: Google Gemini 3 Flash (Latest low-latency multimodal model).
+🥘 Desi Hacks: Expertly handles Indian spices and suggests shortcuts (like microwave par-boiling).
 
-Framework: Streamlit for the web interface.
+🥗 Dietary Logic: Supports Non-Veg, Veg, Jain, and Vegan preferences.
 
-Language: Python 3.10+.
+📱 Kitchen-Ready: A clean, light-mode UI designed for quick reading on mobile while you cook.
 
-Deployment: Streamlit Community Cloud.
+🛠️ The Tech Stack
+🧠 AI Engine: Google Gemini 3 Flash (Low-latency multimodal model).
 
-🧠 AI Learnings (PM Perspective)
-Latency vs. Accuracy: Chose the Flash model series to ensure near-instant responses, as speed is the primary value proposition for the target user.
+🏗️ Framework: Streamlit (For the web interface).
 
-Prompt Engineering: Developed structured system instructions to enforce strict formatting and "Bite-Hack" shortcuts.
+🐍 Language: Python 3.10+.
 
-Computer Vision: Implemented multimodal processing to reduce user friction (Image-to-Recipe vs. manual typing).
+☁️ Hosting: Streamlit Community Cloud.
 
-💻 Local Setup
-Clone the repo:
+🧠 AI Product Insights
+Latency over Logic: I chose the Flash model because for a hungry user, a 2-second response is better than a 20-second "perfect" response.
 
-Bash
+Prompt Guardrails: Engineered system instructions to ensure the AI never suggests long-drawn processes like "slow-cooking" or "overnight marination."
 
-git clone https://github.com/your-username/bitebot-ai.git
-cd bitebot-ai
-Install dependencies:
+Frictionless UX: By using Computer Vision, I removed the need for users to type out long lists of ingredients.
 
-Bash
+💻 How to Run Locally
+Clone the Repo: git clone https://github.com/your-username/bitebot-ai.git
 
-pip install -r requirements.txt
-Set up Secrets: Create a .streamlit/secrets.toml file and add your Gemini API Key:
+Install Libraries: pip install streamlit google-generativeai Pillow
 
-Ini, TOML
+Add API Key: Create a .streamlit/secrets.toml file and add: GEMINI_API_KEY = "your_key_here"
 
-GEMINI_API_KEY = "your_key_here"
-Run the app:
+Launch: streamlit run bitebot.py
 
-Bash
-
-streamlit run bitebot.py
 Made with ❤️ for Food x AI — Abhinav
