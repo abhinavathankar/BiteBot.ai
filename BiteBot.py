@@ -79,7 +79,8 @@ if st.button("GENERATE MY BITE"):
                 st.error(f"Generation Error: {e}")
 
 st.divider()
-st.center = st.write("Made with love for Food x AI - Abhinav")
+st.center = st.write("Made with ❤️ for Food x AI - Abhinav")
+
 
 
 
