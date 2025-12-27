@@ -160,7 +160,7 @@ if st.session_state.cart:
         header_printed = False
 
         if has_unchecked:
-            st.caption("To Buy")
+            st.caption("📋 To Buy")
         
         for i in sorted_indices:
             item = st.session_state.cart[i]
@@ -188,3 +188,4 @@ if st.session_state.cart:
 
 st.divider()
 st.center = st.write("Made with ❤️ for Food x AI - Abhinav")
+
