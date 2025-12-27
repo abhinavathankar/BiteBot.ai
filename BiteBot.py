@@ -11,8 +11,8 @@ except Exception:
     st.error("Missing GEMINI_API_KEY! Add it to Streamlit Cloud Secrets.")
     st.stop()
 
-# --- 2. ROBUST MODEL SELECTION ---
-AVAILABLE_MODELS = ['gemini-2.0-flash-exp', 'gemini-1.5-flash'] # Updated for latest models
+# --- 2. ROBUST MODEL SELECTION (RESTORED) ---
+AVAILABLE_MODELS = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-flash']
 model = None
 current_engine = ""
 
@@ -30,11 +30,11 @@ if not model:
     st.error(f"No compatible Gemini models found. Check your API quota.")
     st.stop()
 
-# --- 3. SESSION STATE INITIALIZATION ---
+# --- 3. SESSION STATE SETUP (Fixes the "disappearing" bugs) ---
 if 'recipes' not in st.session_state:
     st.session_state.recipes = []
 if 'cart' not in st.session_state:
-    st.session_state.cart = []
+    st.session_state.cart = [] # List of dicts: {'name': 'Salt', 'checked': False}
 
 # --- 4. UI STYLING ---
 st.set_page_config(page_title="BiteBot.ai", page_icon="🍔")
@@ -43,9 +43,7 @@ st.markdown(f"""
     <style>
     .stApp {{ background-color: #FFFFFF; color: #000000; }}
     .main-title {{ color: #FFCC00; font-size: 3rem; font-weight: 800; text-align: center; }}
-    
-    /* Custom Strikethrough for collected items */
-    .stCheckbox p {{ font-size: 1rem; }}
+    .stCheckbox {{ padding-left: 5px; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -64,12 +62,13 @@ with col2:
     diet = st.selectbox("Diet", ["Non-veg", "Veg", "Jain", "Vegan"])
     prep_time = st.select_slider("Max Time", options=["5 min", "10 min", "15 min"])
 
-# --- 6. GENERATION LOGIC ---
+# --- 6. RECIPE GENERATION ---
 if st.button("GENERATE MY BITE"):
     if not (uploaded_file or text_items):
         st.warning("Upload a photo or type ingredients!")
     else:
-        with st.spinner("⚡ Chef is cooking..."):
+        with st.spinner(f"⚡ Cooking with {current_engine}..."):
+            # Prompt ensures JSON output for easy parsing
             prompt = f"""
             Act as an API. Analyze the inputs and return a JSON list of exactly 3 recipes.
             
@@ -95,25 +94,26 @@ if st.button("GENERATE MY BITE"):
             if uploaded_file: inputs.append(Image.open(uploaded_file))
 
             try:
+                # Force JSON response
                 response = model.generate_content(inputs, generation_config={"response_mime_type": "application/json"})
                 data = json.loads(response.text)
                 
-                # Save to Session State
+                # Save recipes to Session State
                 st.session_state.recipes = data
                 
-                # Update cart in session state (deduplicated)
+                # Update Cart Logic: Extract unique missing ingredients
                 new_items = []
                 for r in data:
                     new_items.extend(r.get('missing_ingredients', []))
                 
-                # Only add items that aren't already tracked
-                current_items = [item['name'] for item in st.session_state.cart]
-                for item in list(set(new_items)):
-                    if item not in current_items:
-                        st.session_state.cart.append({"name": item, "checked": False})
+                # Add only new items to the session cart, defaulting 'checked' to False
+                existing_names = [item['name'] for item in st.session_state.cart]
+                for item_name in list(set(new_items)):
+                    if item_name not in existing_names:
+                        st.session_state.cart.append({'name': item_name, 'checked': False})
                 
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Generation Error: {e}")
 
 # --- 7. DISPLAY RECIPES (COLLAPSIBLE) ---
 if st.session_state.recipes:
@@ -124,64 +124,67 @@ if st.session_state.recipes:
         name = recipe['name']
         missing = recipe.get('missing_ingredients', [])
         
+        # Display logic: Add asterisk if ingredients are missing
         display_name = f"{name} *" if missing else name
         
+        # USE EXPANDER: Hides details until clicked
         with st.expander(display_name):
             st.markdown(f"**⏱️ Time:** {recipe['time']}")
             st.markdown(f"**🛠️ Steps:** {recipe['steps']}")
             if missing:
                 st.info(f"🛒 Needs: {', '.join(missing)}")
     
-    st.caption("* Requires additional ingredients")
+    st.caption("* Requires additional ingredients (added to cart below)")
 
-# --- 8. SMART SHOPPING CART (FIXED & BORDERED) ---
+# --- 8. SMART SHOPPING CART (FIXED & INTERACTIVE) ---
 if st.session_state.cart:
     st.divider()
     st.markdown("### 🛒 Smart Shopping Cart")
     
-    # USE NATIVE CONTAINER (Fixes the visual bug)
+    # Use st.container with border=True for a clean visual box
     with st.container(border=True):
         
-        # 1. Helper function to toggle state
-        def toggle_item(index):
-            st.session_state.cart[index]['checked'] = not st.session_state.cart[index]['checked']
+        # Helper to toggle check status
+        def toggle_item(idx):
+            st.session_state.cart[idx]['checked'] = not st.session_state.cart[idx]['checked']
 
-        # 2. Sort items: Unchecked first, then Checked
-        # We use indices to map back to the original list
+        # Sort: Unchecked items first, Checked items last
+        # We store index to map back to original list
         sorted_indices = sorted(
             range(len(st.session_state.cart)), 
-            key=lambda i: st.session_state.cart[i]['checked']
+            key=lambda k: st.session_state.cart[k]['checked']
         )
-
-        # 3. Render Items
-        has_items_to_buy = False
         
-        st.caption("To Buy")
+        # Flags to manage headers
+        has_unchecked = any(not st.session_state.cart[i]['checked'] for i in range(len(st.session_state.cart)))
+        header_printed = False
+
+        if has_unchecked:
+            st.caption("To Buy")
+        
         for i in sorted_indices:
             item = st.session_state.cart[i]
             
-            # If we hit the first checked item, render a separator
-            if item['checked'] and not has_checked_section:
+            # Print "Collected" header once we switch to checked items
+            if item['checked'] and not header_printed and has_unchecked:
                 st.divider()
                 st.caption("✅ Collected")
-                has_checked_section = True
-            
-            # Render Checkbox
-            # Note: We use the index 'i' in the key to ensure uniqueness
+                header_printed = True
+            elif item['checked'] and not has_unchecked and not header_printed:
+                st.caption("✅ Collected")
+                header_printed = True
+
+            # The Checkbox
+            # Note: Strikethrough (~~text~~) is applied if checked
             label = f"~~{item['name']}~~" if item['checked'] else item['name']
+            
             st.checkbox(
-                label, 
-                value=item['checked'], 
-                key=f"item_{i}", 
+                label,
+                value=item['checked'],
+                key=f"cart_item_{i}",
                 on_change=toggle_item,
                 args=(i,)
             )
-            
-            if not item['checked']:
-                has_items_to_buy = True
-
-        if not has_items_to_buy and len(st.session_state.cart) > 0:
-            st.success("🎉 All items collected!")
 
 st.divider()
 st.center = st.write("Made with ❤️ for Food x AI - Abhinav")
