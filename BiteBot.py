@@ -134,7 +134,7 @@ if st.session_state.recipes:
             if missing:
                 st.info(f"🛒 Needs: {', '.join(missing)}")
     
-    st.caption("* Requires additional ingredients (added to cart below)")
+    st.caption("* Requires additional ingredients (added to the cart below)")
 
 # --- 8. SMART SHOPPING CART (FIXED & INTERACTIVE) ---
 if st.session_state.cart:
@@ -188,4 +188,5 @@ if st.session_state.cart:
 
 st.divider()
 st.center = st.write("Made with ❤️ for Food x AI - Abhinav")
+
 
