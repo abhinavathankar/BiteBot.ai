@@ -12,7 +12,7 @@ except Exception:
     st.stop()
 
 # --- 2. ROBUST MODEL SELECTION ---
-AVAILABLE_MODELS = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-flash']
+AVAILABLE_MODELS = ['gemini-2.0-flash-exp', 'gemini-1.5-flash'] # Updated for latest models
 model = None
 current_engine = ""
 
@@ -30,7 +30,7 @@ if not model:
     st.error(f"No compatible Gemini models found. Check your API quota.")
     st.stop()
 
-# --- 3. SESSION STATE INITIALIZATION (Crucial for fixing app state) ---
+# --- 3. SESSION STATE INITIALIZATION ---
 if 'recipes' not in st.session_state:
     st.session_state.recipes = []
 if 'cart' not in st.session_state:
@@ -44,28 +44,8 @@ st.markdown(f"""
     .stApp {{ background-color: #FFFFFF; color: #000000; }}
     .main-title {{ color: #FFCC00; font-size: 3rem; font-weight: 800; text-align: center; }}
     
-    /* Collapsible Card Styling */
-    .streamlit-expanderHeader {{
-        font-weight: bold;
-        font-size: 1.2rem;
-        color: #333;
-        border-left: 5px solid #FFCC00;
-        background-color: #f9f9f9;
-        border-radius: 8px;
-    }}
-    
-    /* Cart Styling */
-    .cart-container {{
-        border: 2px dashed #FFCC00;
-        padding: 20px;
-        border-radius: 12px;
-        background-color: #fffdf0;
-        margin-top: 20px;
-    }}
-    .collected-item {{
-        text-decoration: line-through;
-        color: #888;
-    }}
+    /* Custom Strikethrough for collected items */
+    .stCheckbox p {{ font-size: 1rem; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -118,16 +98,19 @@ if st.button("GENERATE MY BITE"):
                 response = model.generate_content(inputs, generation_config={"response_mime_type": "application/json"})
                 data = json.loads(response.text)
                 
-                # Save to Session State (So they persist!)
+                # Save to Session State
                 st.session_state.recipes = data
                 
-                # Extract all missing ingredients for the cart
-                all_missing = []
-                for r in data:
-                    all_missing.extend(r.get('missing_ingredients', []))
-                
                 # Update cart in session state (deduplicated)
-                st.session_state.cart = list(set(all_missing))
+                new_items = []
+                for r in data:
+                    new_items.extend(r.get('missing_ingredients', []))
+                
+                # Only add items that aren't already tracked
+                current_items = [item['name'] for item in st.session_state.cart]
+                for item in list(set(new_items)):
+                    if item not in current_items:
+                        st.session_state.cart.append({"name": item, "checked": False})
                 
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -141,57 +124,64 @@ if st.session_state.recipes:
         name = recipe['name']
         missing = recipe.get('missing_ingredients', [])
         
-        # Add visual cue if ingredients are missing
         display_name = f"{name} *" if missing else name
         
-        # Use Expander to hide details by default
         with st.expander(display_name):
             st.markdown(f"**⏱️ Time:** {recipe['time']}")
             st.markdown(f"**🛠️ Steps:** {recipe['steps']}")
             if missing:
                 st.info(f"🛒 Needs: {', '.join(missing)}")
     
-    st.caption("* Requires additional ingredients (added to cart below)")
+    st.caption("* Requires additional ingredients")
 
-# --- 8. SMART SHOPPING CART (PERSISTENT) ---
+# --- 8. SMART SHOPPING CART (FIXED & BORDERED) ---
 if st.session_state.cart:
     st.divider()
     st.markdown("### 🛒 Smart Shopping Cart")
     
-    # Render the Dotted Box Container
-    st.markdown("<div class='cart-container'>", unsafe_allow_html=True)
-    
-    # Initialize check states in session_state if new items appeared
-    for item in st.session_state.cart:
-        key = f"check_{item}"
-        if key not in st.session_state:
-            st.session_state[key] = False
+    # USE NATIVE CONTAINER (Fixes the visual bug)
+    with st.container(border=True):
+        
+        # 1. Helper function to toggle state
+        def toggle_item(index):
+            st.session_state.cart[index]['checked'] = not st.session_state.cart[index]['checked']
 
-    # Filter items into two lists based on their checkbox state
-    to_buy = [item for item in st.session_state.cart if not st.session_state[f"check_{item}"]]
-    collected = [item for item in st.session_state.cart if st.session_state[f"check_{item}"]]
+        # 2. Sort items: Unchecked first, then Checked
+        # We use indices to map back to the original list
+        sorted_indices = sorted(
+            range(len(st.session_state.cart)), 
+            key=lambda i: st.session_state.cart[i]['checked']
+        )
 
-    # 1. To Buy List (Unchecked)
-    if to_buy:
-        st.markdown("**To Buy:**")
-        for item in to_buy:
-            # When clicked, this updates st.session_state[key] and re-runs the script
-            st.checkbox(item, key=f"check_{item}")
-    else:
-        if not collected:
-            st.info("Cart is empty!")
-        else:
-            st.success("🎉 All items collected!")
-
-    # 2. Collected List (Checked/Visual Separation)
-    if collected:
-        st.markdown("---")
-        st.markdown("**✅ Collected:**")
-        for item in collected:
-            # We show these as checked. Unchecking them moves them back to 'To Buy'
-            st.checkbox(f"~~{item}~~", value=True, key=f"check_{item}")
+        # 3. Render Items
+        has_items_to_buy = False
+        
+        st.caption("To Buy")
+        for i in sorted_indices:
+            item = st.session_state.cart[i]
             
-    st.markdown("</div>", unsafe_allow_html=True)
+            # If we hit the first checked item, render a separator
+            if item['checked'] and not has_checked_section:
+                st.divider()
+                st.caption("✅ Collected")
+                has_checked_section = True
+            
+            # Render Checkbox
+            # Note: We use the index 'i' in the key to ensure uniqueness
+            label = f"~~{item['name']}~~" if item['checked'] else item['name']
+            st.checkbox(
+                label, 
+                value=item['checked'], 
+                key=f"item_{i}", 
+                on_change=toggle_item,
+                args=(i,)
+            )
+            
+            if not item['checked']:
+                has_items_to_buy = True
+
+        if not has_items_to_buy and len(st.session_state.cart) > 0:
+            st.success("🎉 All items collected!")
 
 st.divider()
 st.center = st.write("Made with ❤️ for Food x AI - Abhinav")
