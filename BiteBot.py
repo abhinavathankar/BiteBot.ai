@@ -11,8 +11,7 @@ except Exception:
     st.error("Missing GEMINI_API_KEY! Add it to Streamlit Cloud Secrets.")
     st.stop()
 
-# --- ROBUST MODEL SELECTION (RESTORED) ---
-# We try Gemini 3 Flash Preview first. If not found, we fallback to 2.5 Flash.
+# --- 2. ROBUST MODEL SELECTION ---
 AVAILABLE_MODELS = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-flash']
 model = None
 current_engine = ""
@@ -20,7 +19,6 @@ current_engine = ""
 for model_name in AVAILABLE_MODELS:
     try:
         test_model = genai.GenerativeModel(model_name)
-        # Quick test call to verify availability
         test_model.count_tokens("test") 
         model = test_model
         current_engine = model_name
@@ -29,33 +27,52 @@ for model_name in AVAILABLE_MODELS:
         continue
 
 if not model:
-    st.error(f"No compatible Gemini models found (Tried: {AVAILABLE_MODELS}). Check your API quota/region.")
+    st.error(f"No compatible Gemini models found. Check your API quota.")
     st.stop()
 
-# --- 2. UI STYLING ---
+# --- 3. SESSION STATE INITIALIZATION (Crucial for fixing app state) ---
+if 'recipes' not in st.session_state:
+    st.session_state.recipes = []
+if 'cart' not in st.session_state:
+    st.session_state.cart = []
+
+# --- 4. UI STYLING ---
 st.set_page_config(page_title="BiteBot.ai", page_icon="🍔")
 
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #FFFFFF; color: #000000; }}
     .main-title {{ color: #FFCC00; font-size: 3rem; font-weight: 800; text-align: center; }}
-    .recipe-card {{ 
-        padding: 20px; 
-        margin-bottom: 15px;
-        border-radius: 12px; 
-        background-color: #f9f9f9; 
-        border-left: 6px solid #FFCC00; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    
+    /* Collapsible Card Styling */
+    .streamlit-expanderHeader {{
+        font-weight: bold;
+        font-size: 1.2rem;
+        color: #333;
+        border-left: 5px solid #FFCC00;
+        background-color: #f9f9f9;
+        border-radius: 8px;
     }}
-    .recipe-title {{ font-size: 1.5rem; font-weight: bold; color: #333; }}
-    .cart-box {{ border: 2px dashed #FFCC00; padding: 15px; border-radius: 10px; margin-top: 20px; }}
+    
+    /* Cart Styling */
+    .cart-container {{
+        border: 2px dashed #FFCC00;
+        padding: 20px;
+        border-radius: 12px;
+        background-color: #fffdf0;
+        margin-top: 20px;
+    }}
+    .collected-item {{
+        text-decoration: line-through;
+        color: #888;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
 st.markdown("<h1 class='main-title'>🍔 BiteBot.ai</h1>", unsafe_allow_html=True)
 st.caption(f"Engine: {current_engine}")
 
-# --- 3. INPUTS ---
+# --- 5. INPUTS ---
 col1, col2 = st.columns(2)
 with col1:
     uploaded_file = st.file_uploader("📸 Photo Scan", type=["jpg", "jpeg", "png"])
@@ -67,18 +84,16 @@ with col2:
     diet = st.selectbox("Diet", ["Non-veg", "Veg", "Jain", "Vegan"])
     prep_time = st.select_slider("Max Time", options=["5 min", "10 min", "15 min"])
 
-# --- 4. RECIPE LOGIC ---
+# --- 6. GENERATION LOGIC ---
 if st.button("GENERATE MY BITE"):
     if not (uploaded_file or text_items):
         st.warning("Upload a photo or type ingredients!")
     else:
-        with st.spinner(f"⚡ Crunching with {current_engine}..."):
-            
-            # --- AGENTIC PROMPT FOR JSON OUTPUT ---
+        with st.spinner("⚡ Chef is cooking..."):
             prompt = f"""
             Act as an API. Analyze the inputs and return a JSON list of exactly 3 recipes.
             
-            1. **Recipe 1 (Strict):** MUST use ONLY the provided/detected ingredients + basic pantry staples (Salt, Oil, Water, basic Spices). 'missing_ingredients' list must be empty [].
+            1. **Recipe 1 (Strict):** MUST use ONLY the provided/detected ingredients + basic pantry staples. 'missing_ingredients' list must be empty [].
             2. **Recipe 2 (Creative):** Can use 1-2 extra ingredients. List them in 'missing_ingredients'.
             3. **Recipe 3 (Creative):** Can use different extra ingredients. List them in 'missing_ingredients'.
             
@@ -100,50 +115,83 @@ if st.button("GENERATE MY BITE"):
             if uploaded_file: inputs.append(Image.open(uploaded_file))
 
             try:
-                # Force JSON response mode
                 response = model.generate_content(inputs, generation_config={"response_mime_type": "application/json"})
-                recipes_data = json.loads(response.text)
+                data = json.loads(response.text)
                 
-                # --- PROCESS & DISPLAY RECIPES ---
-                cart_items = [] # To collect missing items
+                # Save to Session State (So they persist!)
+                st.session_state.recipes = data
                 
-                for idx, recipe in enumerate(recipes_data):
-                    name = recipe['name']
-                    missing = recipe.get('missing_ingredients', [])
-                    
-                    # Logic: Add asterisk if missing ingredients exist
-                    display_name = name
-                    if missing:
-                        display_name += " *"
-                        cart_items.extend(missing) # Add to master cart list
-
-                    # Render Card
-                    st.markdown(f"""
-                    <div class='recipe-card'>
-                        <div class='recipe-title'>{display_name}</div>
-                        <p>⏱️ {recipe['time']}</p>
-                        <p>🛠️ {recipe['steps']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                # --- FOOTNOTE ---
-                st.caption("* Additional items required, added to your cart")
-
-                # --- SMART SHOPPING CART ---
-                if cart_items:
-                    unique_cart = list(set(cart_items))
-                    
-                    st.divider()
-                    # The "Show Cart" dropdown
-                    with st.expander(f"🛒 Show Cart ({len(unique_cart)} items added)"):
-                        st.markdown("<div class='cart-box'>", unsafe_allow_html=True)
-                        for item in unique_cart:
-                            st.checkbox(item, value=True, key=item)
-                        st.markdown("</div>", unsafe_allow_html=True)
-                        st.button("Checkout / Save List")
-
+                # Extract all missing ingredients for the cart
+                all_missing = []
+                for r in data:
+                    all_missing.extend(r.get('missing_ingredients', []))
+                
+                # Update cart in session state (deduplicated)
+                st.session_state.cart = list(set(all_missing))
+                
             except Exception as e:
-                st.error(f"Generation Error: {e}")
+                st.error(f"Error: {e}")
+
+# --- 7. DISPLAY RECIPES (COLLAPSIBLE) ---
+if st.session_state.recipes:
+    st.divider()
+    st.subheader("🍳 Choose your Meal")
+    
+    for recipe in st.session_state.recipes:
+        name = recipe['name']
+        missing = recipe.get('missing_ingredients', [])
+        
+        # Add visual cue if ingredients are missing
+        display_name = f"{name} *" if missing else name
+        
+        # Use Expander to hide details by default
+        with st.expander(display_name):
+            st.markdown(f"**⏱️ Time:** {recipe['time']}")
+            st.markdown(f"**🛠️ Steps:** {recipe['steps']}")
+            if missing:
+                st.info(f"🛒 Needs: {', '.join(missing)}")
+    
+    st.caption("* Requires additional ingredients (added to cart below)")
+
+# --- 8. SMART SHOPPING CART (PERSISTENT) ---
+if st.session_state.cart:
+    st.divider()
+    st.markdown("### 🛒 Smart Shopping Cart")
+    
+    # Render the Dotted Box Container
+    st.markdown("<div class='cart-container'>", unsafe_allow_html=True)
+    
+    # Initialize check states in session_state if new items appeared
+    for item in st.session_state.cart:
+        key = f"check_{item}"
+        if key not in st.session_state:
+            st.session_state[key] = False
+
+    # Filter items into two lists based on their checkbox state
+    to_buy = [item for item in st.session_state.cart if not st.session_state[f"check_{item}"]]
+    collected = [item for item in st.session_state.cart if st.session_state[f"check_{item}"]]
+
+    # 1. To Buy List (Unchecked)
+    if to_buy:
+        st.markdown("**To Buy:**")
+        for item in to_buy:
+            # When clicked, this updates st.session_state[key] and re-runs the script
+            st.checkbox(item, key=f"check_{item}")
+    else:
+        if not collected:
+            st.info("Cart is empty!")
+        else:
+            st.success("🎉 All items collected!")
+
+    # 2. Collected List (Checked/Visual Separation)
+    if collected:
+        st.markdown("---")
+        st.markdown("**✅ Collected:**")
+        for item in collected:
+            # We show these as checked. Unchecking them moves them back to 'To Buy'
+            st.checkbox(f"~~{item}~~", value=True, key=f"check_{item}")
+            
+    st.markdown("</div>", unsafe_allow_html=True)
 
 st.divider()
 st.center = st.write("Made with ❤️ for Food x AI - Abhinav")
